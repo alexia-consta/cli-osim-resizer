@@ -1,0 +1,12 @@
+{
+  "name": "50x50-resizer",
+  "version": "1.0.0",
+  "description": "A smart CLI tool to resize images to 50x50mm for Romanian OSIM trademarks.",
+  "main": "macresizer.js",
+  "bin": {
+    "osim-resizer": "./macresizer.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.2"
+  }
+}
