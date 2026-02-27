@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSIM 50x50mm Resizer</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6 font-sans">
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+        
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">50x50mm Resizer & .jpeg Converter</h1>
+        <p class="text-gray-500 mb-8 text-sm">Upload any file to convert & resize.</p>
+
+        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-10 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group relative overflow-hidden" tabindex="0">
+            <input id="file-input" type="file" accept="image/*,.heic,.heif,.tif,.tiff" class="hidden" />
+            
+            <div id="ui-upload">
+                <div class="text-4xl mb-4 grayscale group-hover:grayscale-0">📂</div>
+                <p class="text-gray-600 group-hover:text-blue-600">Click to Upload</p>
+            </div>
+
+            <div id="ui-processing" class="hidden flex flex-col items-center justify-center py-4">
+                <div class="animate-spin text-blue-500 text-4xl mb-2">⟳</div>
+                <p class="text-gray-600">Processing...</p>
+            </div>
+
+            <div id="ui-preview" class="hidden">
+                <div class="relative inline-block">
+                    <img id="preview-img" src="" alt="Processed" class="mx-auto rounded-lg shadow-md w-32 h-32 border border-gray-200" />
+                    <span id="badge-dual" class="hidden absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full shadow-sm">Dual Mode</span>
+                </div>
+                <p class="mt-4 text-green-600 font-medium">Done!</p>
+            </div>
+        </div>
+
+        <div id="ui-actions" class="mt-6 space-y-3 hidden">
+            
+            <div id="btn-group-dual" class="hidden space-y-3">
+                <button id="btn-download-white" class="w-full bg-white border-2 border-gray-200 hover:border-blue-500 hover:text-blue-600 text-gray-700 font-semibold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
+                    <div class="w-4 h-4 bg-white border border-gray-300 rounded-sm"></div>
+                    Download White BG
+                </button>
+
+                <button id="btn-download-black" class="w-full bg-gray-900 border-2 border-gray-900 hover:bg-gray-800 hover:border-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all flex items-center justify-center gap-2">
+                    <div class="w-4 h-4 bg-black border border-gray-500 rounded-sm"></div>
+                    Download Black BG
+                </button>
+            </div>
+
+            <button id="btn-download-single" class="hidden w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors">
+                Download .jpeg
+            </button>
+
+            <button id="btn-reset" class="block w-full text-sm text-gray-400 hover:text-gray-600 py-2 mt-2">
+                Reset / New Image
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // State
+        let isProcessing = false;
+        let imageWhite = null;
+        let imageBlack = null;
+        let originalFileName = "image";
+        const PIXELS = 591;
+
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        
+        const uiUpload = document.getElementById('ui-upload');
+        const uiProcessing = document.getElementById('ui-processing');
+        const uiPreview = document.getElementById('ui-preview');
+        const uiActions = document.getElementById('ui-actions');
+        
+        const previewImg = document.getElementById('preview-img');
+        const badgeDual = document.getElementById('badge-dual');
+        
+        const btnGroupDual = document.getElementById('btn-group-dual');
+        const btnDownloadSingle = document.getElementById('btn-download-single');
+        const btnDownloadWhite = document.getElementById('btn-download-white');
+        const btnDownloadBlack = document.getElementById('btn-download-black');
+        const btnReset = document.getElementById('btn-reset');
+
+        // UI Manager (Replaces Svelte Reactivity)
+        const updateUI = () => {
+            uiUpload.classList.add('hidden');
+            uiProcessing.classList.add('hidden');
+            uiPreview.classList.add('hidden');
+            uiActions.classList.add('hidden');
+            badgeDual.classList.add('hidden');
+            btnGroupDual.classList.add('hidden');
+            btnDownloadSingle.classList.add('hidden');
+
+            if (isProcessing) {
+                uiProcessing.classList.remove('hidden');
+            } else if (imageWhite) {
+                uiPreview.classList.remove('hidden');
+                uiActions.classList.remove('hidden');
+                previewImg.src = imageWhite;
+                
+                if (imageBlack) {
+                    badgeDual.classList.remove('hidden');
+                    btnGroupDual.classList.remove('hidden');
+                } else {
+                    btnDownloadSingle.classList.remove('hidden');
+                    btnDownloadSingle.innerText = `Download ${originalFileName}_50x50mm.jpeg`;
+                }
+            } else {
+                uiUpload.classList.remove('hidden');
+            }
+        };
+
+        // Event Listeners
+        dropZone.addEventListener('click', () => { if (!isProcessing) fileInput.click(); });
+        dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !isProcessing) fileInput.click(); });
+        
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                originalFileName = file.name.replace(/\.[^/.]+$/, "");
+                imageWhite = null;
+                imageBlack = null;
+                await processImage(file);
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            imageWhite = null;
+            imageBlack = null;
+            fileInput.value = '';
+            updateUI();
+        });
+
+        // Download logic
+        const triggerDownload = (dataUrl, suffix) => {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            const finalSuffix = suffix ? `_${suffix}` : '';
+            link.download = `${originalFileName}_50x50mm${finalSuffix}.jpeg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        btnDownloadSingle.addEventListener('click', () => triggerDownload(imageWhite, ''));
+        btnDownloadWhite.addEventListener('click', () => triggerDownload(imageWhite, 'white_bg'));
+        btnDownloadBlack.addEventListener('click', () => triggerDownload(imageBlack, 'black_bg'));
+
+        // Core Image Processing
+        const hasTransparency = (ctx, width, height) => {
+            const imageData = ctx.getImageData(0, 0, width, height).data;
+            for (let i = 3; i < imageData.length; i += 4) {
+                if (imageData[i] < 255) return true;
+            }
+            return false;
+        };
+
+        const readFileAsUrl = (file) => {
+            return new Promise(async (resolve, reject) => {
+                const name = file.name.toLowerCase();
+                const type = file.type.toLowerCase();
+
+                if (name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic')) {
+                    try {
+                        const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+                        const blob = Array.isArray(converted) ? converted[0] : converted;
+                        resolve(URL.createObjectURL(blob));
+                    } catch (e) { reject(e); }
+                    return;
+                }
+
+                if (name.endsWith('.tif') || name.endsWith('.tiff') || type === 'image/tiff') {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const buffer = e.target.result;
+                            const ifds = UTIF.decode(buffer);
+                            UTIF.decodeImage(buffer, ifds[0]);
+                            const rgba = UTIF.toRGBA8(ifds[0]);
+                            const imageData = new ImageData(new Uint8ClampedArray(rgba), ifds[0].width, ifds[0].height);
+                            const cvs = document.createElement('canvas');
+                            cvs.width = ifds[0].width;
+                            cvs.height = ifds[0].height;
+                            cvs.getContext('2d').putImageData(imageData, 0, 0);
+                            resolve(cvs.toDataURL('image/png'));
+                        } catch (err) { reject(err); }
+                    };
+                    reader.readAsArrayBuffer(file);
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+        };
+
+        const processImage = async (file) => {
+            isProcessing = true;
+            updateUI();
+
+            try {
+                const imageUrl = await readFileAsUrl(file);
+                const img = new Image();
+                
+                img.onload = () => {
+                    const helperCanvas = document.createElement('canvas');
+                    helperCanvas.width = PIXELS;
+                    helperCanvas.height = PIXELS;
+                    const helperCtx = helperCanvas.getContext('2d');
+                    
+                    helperCtx.drawImage(img, 0, 0, PIXELS, PIXELS);
+                    const isTransparent = hasTransparency(helperCtx, PIXELS, PIXELS);
+
+                    const canvasWhite = document.createElement('canvas');
+                    canvasWhite.width = PIXELS;
+                    canvasWhite.height = PIXELS;
+                    const ctxWhite = canvasWhite.getContext('2d');
+                    ctxWhite.fillStyle = '#FFFFFF';
+                    ctxWhite.fillRect(0, 0, PIXELS, PIXELS);
+                    ctxWhite.drawImage(img, 0, 0, PIXELS, PIXELS);
+                    imageWhite = canvasWhite.toDataURL('image/jpeg', 0.95);
+
+                    if (isTransparent) {
+                        const canvasBlack = document.createElement('canvas');
+                        canvasBlack.width = PIXELS;
+                        canvasBlack.height = PIXELS;
+                        const ctxBlack = canvasBlack.getContext('2d');
+                        ctxBlack.fillStyle = '#000000';
+                        ctxBlack.fillRect(0, 0, PIXELS, PIXELS);
+                        ctxBlack.drawImage(img, 0, 0, PIXELS, PIXELS);
+                        imageBlack = canvasBlack.toDataURL('image/jpeg', 0.95);
+                    }
+
+                    isProcessing = false;
+                    updateUI();
+                };
+
+                img.onerror = () => {
+                    alert("Browser could not read this image.");
+                    isProcessing = false;
+                    updateUI();
+                };
+                
+                img.src = imageUrl;
+
+            } catch (error) {
+                console.error(error);
+                alert("Error: " + error.message);
+                isProcessing = false;
+                updateUI();
+            }
+        };
+
+        // Initialize UI
+        updateUI();
+    </script>
+</body>
+</html>
