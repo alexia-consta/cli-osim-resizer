@@ -1,5 +1,11 @@
 # 🇷🇴 OSIM 50x50mm Resizer CLI (`cli-osim-resizer`)
 
+> **🌐 NEW: Live Web Version Available!**
+> Don't want to use the terminal? Try our free, drag-and-drop **[Web App](https://alexia-consta.github.io/cli-osim-resizer/)**.
+> It requires zero installation, features a live interactive color picker, and processes everything securely right inside your browser (no data is uploaded).
+
+---
+
 A powerful, cross-platform command-line tool designed specifically for Romanian Trademark (OSIM) applications. It perfectly resizes logos and images to the mandatory 50x50mm (300 DPI) JPEG format. 
 
 It features intelligent transparency detection and an interactive prompt to generate custom background colors using Hex, RGB, or HSL so your trademark background is exactly what you want.
