@@ -54,4 +54,4 @@ oklch(70% 0.122 150) or rgb(255, 255, 255)
 If you choose not to provide a custom color, the tool will automatically generate high-quality White and Black background versions for you to choose from.
 
 ## ⚖️ License
-Distributed under the MIT License. See ```LICENSE ```for more information.
+Distributed under the MIT License. See ```LICENSE```for more information.
